@@ -46,6 +46,19 @@ function matchesPriorityFilter(item) {
 
 const loaded = ref(false)
 const refVocabulary = reactive(vocabulary)
+
+const filteredWordCount = computed(() => {
+  const cur = refVocabulary[category.value]
+  let count = 0
+  for (const group of cur.words) {
+    for (const item of group) {
+      if (matchesPriorityFilter(item))
+        count++
+    }
+  }
+  return count
+})
+
 const wordList = computed(() => {
   const result = structuredClone(vocabulary) // deep clone
   // const keywordValue = keyword.value.trim().toLowerCase()
@@ -354,6 +367,7 @@ function copyAllError() {
                         <div class="flex flex-1 items-center">
                           <span class="text-lg">{{ category }}</span>
                           （ {{ refVocabulary[category].groupCount }} 组 {{ refVocabulary[category].wordCount }} 个词 ）
+                          <span v-if="priorityFilter !== 'all'">，已筛选 {{ filteredWordCount }} 个词</span>
                         </div>
                         <div class="justify-items-end">
                           <audio controls class="chapter">
