@@ -3,6 +3,28 @@
 import vocabulary from './vocabulary'
 
 const CHAPTER_KEY = 'vocabulary_chapter'
+const EXTRA_OVERRIDES_KEY = 'vocabulary_extra_overrides'
+
+function loadExtraOverrides() {
+  try {
+    return JSON.parse(localStorage.getItem(EXTRA_OVERRIDES_KEY) || '{}')
+  }
+  catch {
+    return {}
+  }
+}
+
+function saveExtraOverride(id, value) {
+  const overrides = loadExtraOverrides()
+  overrides[id] = value
+  localStorage.setItem(EXTRA_OVERRIDES_KEY, JSON.stringify(overrides))
+}
+
+function onExtraBlur(e, item) {
+  const value = e.target.textContent.trim()
+  item.extra = value
+  saveExtraOverride(item.id, value)
+}
 
 const isTrainingModel = ref(false)
 const isShowMeaning = ref(true)
@@ -97,6 +119,16 @@ const isFilterActive = computed(() => hasImportanceSelection.value || priorityFi
 
 const loaded = ref(false)
 const refVocabulary = reactive(vocabulary)
+
+const extraOverrides = loadExtraOverrides()
+for (const cat of Object.values(refVocabulary)) {
+  for (const group of cat.words) {
+    for (const item of group) {
+      if (extraOverrides[item.id] !== undefined)
+        item.extra = extraOverrides[item.id]
+    }
+  }
+}
 
 const filteredWordCount = computed(() => {
   const cur = refVocabulary[category.value]
@@ -203,6 +235,11 @@ onUpdated(() => {
 })
 
 document.addEventListener('keydown', (ev) => {
+  const target = ev.target
+  const isEditingText = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+  if (isEditingText)
+    return
+
   // 激活的那个音频可以通过方向键进行快进/退
   if (['ArrowLeft', 'ArrowRight', ' '].includes(ev.key)) {
     ev.preventDefault()
@@ -541,7 +578,14 @@ function copyAllError() {
                         {{ isTrainingModel ? '' : item.example }}
                       </td>
                       <td class="p-4">
-                        {{ isTrainingModel ? '' : item.extra }}
+                        <div
+                          v-if="!isTrainingModel"
+                          class="min-w-20 rounded p-1 outline-none focus:bg-white hover:bg-gray-50 focus:ring-1 focus:ring-blue-500 dark:focus:bg-gray-700 dark:hover:bg-gray-700"
+                          contenteditable="true"
+                          @blur="onExtraBlur($event, item)"
+                        >
+                          {{ item.extra }}
+                        </div>
                       </td>
                     </tr>
                   </template>
