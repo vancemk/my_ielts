@@ -59,6 +59,21 @@ const filteredWordCount = computed(() => {
   return count
 })
 
+const filteredIndexMap = computed(() => {
+  const map = new Map()
+  if (priorityFilter.value === 'all')
+    return map
+  const cur = refVocabulary[category.value]
+  let idx = 0
+  for (const group of cur.words) {
+    for (const item of group) {
+      if (matchesPriorityFilter(item))
+        map.set(item.id, ++idx)
+    }
+  }
+  return map
+})
+
 const wordList = computed(() => {
   const result = structuredClone(vocabulary) // deep clone
   // const keywordValue = keyword.value.trim().toLowerCase()
@@ -385,7 +400,7 @@ function copyAllError() {
                       :class="{ 'bg-gray-50 dark:bg-gray-700': item.id % 2 === 0, [`group-color-${i % 15}`]: true }" class="text-sm text-gray-900 dark:text-white"
                     >
                       <td class="p-4">
-                        {{ item.id }}
+                        {{ priorityFilter === 'all' ? item.id : filteredIndexMap.get(item.id) }}
                       </td>
                       <td v-if="item.frequency" class="whitespace-nowrap p-4">
                         <div class="flex flex-col items-start gap-1">
