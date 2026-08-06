@@ -16,6 +16,34 @@ const keyword = ref('')
 const chapters = Object.keys(vocabulary)
 const category = ref(localStorage.getItem(CHAPTER_KEY) || chapters[0])
 
+const priorityFilter = ref('all')
+const FREQUENCY_LABELS = { high: '高频', medium: '中频', low: '低频' }
+const FREQUENCY_CLASSES = {
+  high: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+  medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+  low: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+}
+const MASTERY_LABELS = { productive: '产出', receptive: '识记' }
+const MASTERY_CLASSES = {
+  productive: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+  receptive: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+}
+
+function matchesPriorityFilter(item) {
+  switch (priorityFilter.value) {
+    case 'core':
+      return item.importance >= 4
+    case 'high':
+      return item.frequency === 'high'
+    case 'productive':
+      return item.mastery === 'productive'
+    case 'receptive':
+      return item.mastery === 'receptive'
+    default:
+      return true
+  }
+}
+
 const loaded = ref(false)
 const refVocabulary = reactive(vocabulary)
 const wordList = computed(() => {
@@ -218,6 +246,26 @@ function copyAllError() {
                 {{ k }}
               </option>
             </select>
+            <select
+              v-model="priorityFilter"
+              class="ml-2 block w-full flex-1 border border-gray-300 rounded-lg bg-gray-50 p-2.5 text-sm text-gray-900 dark:border-gray-600 focus:border-blue-500 dark:bg-gray-700 dark:text-white focus:ring-blue-500 dark:focus:border-blue-500 dark:focus:ring-blue-500 dark:placeholder-gray-400"
+            >
+              <option value="all">
+                全部词汇
+              </option>
+              <option value="core">
+                仅核心词（重要度 ≥4）
+              </option>
+              <option value="high">
+                仅高频词
+              </option>
+              <option value="productive">
+                仅产出型
+              </option>
+              <option value="receptive">
+                仅识记型
+              </option>
+            </select>
             <!-- <input type="text" name="email" class="ml-3 block w-full border border-gray-300 rounded-lg bg-gray-50 p-2.5 text-gray-900 dark:border-gray-600 focus:border-primary-500 dark:bg-gray-700 sm:text-sm dark:text-white focus:ring-primary-500 dark:focus:border-primary-500 dark:focus:ring-primary-500 dark:placeholder-gray-400" placeholder="关键词"> -->
             <!-- <div class="relative ml-2 flex-1">
               <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -273,6 +321,9 @@ function copyAllError() {
                     <th class="p-4 text-left text-xs font-medium tracking-wider text-gray-500 dark:text-white">
                       #
                     </th>
+                    <th class="p-4 text-left text-xs font-medium tracking-wider text-gray-500 dark:text-white">
+                      标签
+                    </th>
                     <th class="p-4 text-xs font-medium tracking-wider text-gray-500 dark:text-white">
                       <br>
                     </th>
@@ -296,7 +347,7 @@ function copyAllError() {
                 <tbody class="bg-white dark:bg-gray-800">
                   <tr class="bg-hex-f3f3f3">
                     <td
-                      colspan="7"
+                      colspan="8"
                       class="px-4 py-6 text-sm font-normal text-gray-900 dark:bg-gray-500 dark:text-white"
                     >
                       <div class="flex flex-row">
@@ -315,13 +366,32 @@ function copyAllError() {
                   <template v-for="(wordGroup, i) of refVocabulary[category].words" :key="wordGroup.label">
                     <tr
                       v-for="item of wordGroup"
-                      v-show="(isTrainingModel && (isOnlyShowErrors ? item.spellError : true)) || !isTrainingModel" :id="`tr_${item.id}`"
+                      v-show="((isTrainingModel && (isOnlyShowErrors ? item.spellError : true)) || !isTrainingModel) && matchesPriorityFilter(item)" :id="`tr_${item.id}`"
                       :key="item.id"
                       :class="{ 'bg-gray-50 dark:bg-gray-700': item.id % 2 === 0, [`group-color-${i % 15}`]: true }" class="text-sm text-gray-900 dark:text-white"
                     >
                       <td class="p-4">
                         {{ item.id }}
                       </td>
+                      <td v-if="item.frequency" class="whitespace-nowrap p-4">
+                        <div class="flex flex-col items-start gap-1">
+                          <span
+                            class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                            :class="FREQUENCY_CLASSES[item.frequency]"
+                            :title="`出现频率：${FREQUENCY_LABELS[item.frequency]}`"
+                          >{{ FREQUENCY_LABELS[item.frequency] }}</span>
+                          <span
+                            class="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-900 dark:text-orange-300"
+                            :title="`重要度：${item.importance}/5${item.reason ? ` · ${item.reason}` : ''}`"
+                          >★{{ item.importance }}</span>
+                          <span
+                            class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                            :class="MASTERY_CLASSES[item.mastery]"
+                            :title="item.mastery === 'productive' ? '需要能够主动写出/说出' : '只需要能够识别、理解'"
+                          >{{ MASTERY_LABELS[item.mastery] }}</span>
+                        </div>
+                      </td>
+                      <td v-else class="p-4" />
                       <td>
                         <i
                           class="i-ph-speaker-simple-high-bold inline-block cursor-pointer"
