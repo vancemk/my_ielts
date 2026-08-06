@@ -29,10 +29,59 @@ const MASTERY_CLASSES = {
   receptive: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
 }
 
+const importanceChecks = reactive({ 1: false, 2: false, 3: false, 4: false, 5: false })
+const hasImportanceSelection = computed(() => Object.values(importanceChecks).some(Boolean))
+
+const PRIORITY_OPTIONS = [
+  { value: 'all', label: '全部词汇' },
+  { value: 'gte4', label: '重要度 ≥4（核心词）' },
+  { value: 'gte3', label: '重要度 ≥3' },
+  { value: 'gte2', label: '重要度 ≥2' },
+  { value: 'high', label: '仅高频词' },
+  { value: 'productive', label: '仅产出型' },
+  { value: 'receptive', label: '仅识记型' },
+]
+
+const isFilterOpen = ref(false)
+const filterDropdownRef = ref(null)
+onClickOutside(filterDropdownRef, () => {
+  isFilterOpen.value = false
+})
+
+const filterSummaryLabel = computed(() => {
+  if (hasImportanceSelection.value) {
+    const selected = [5, 4, 3, 2, 1].filter(n => importanceChecks[n])
+    return `重要度：${selected.join('、')}`
+  }
+  return PRIORITY_OPTIONS.find(opt => opt.value === priorityFilter.value)?.label || '全部词汇'
+})
+
+function onImportanceCheckboxChange() {
+  priorityFilter.value = 'all'
+}
+
+function onPriorityFilterChange() {
+  for (const n in importanceChecks)
+    importanceChecks[n] = false
+}
+
+function selectPriorityOption(value) {
+  priorityFilter.value = value
+  onPriorityFilterChange()
+  isFilterOpen.value = false
+}
+
 function matchesPriorityFilter(item) {
+  if (hasImportanceSelection.value)
+    return !!importanceChecks[item.importance]
+
   switch (priorityFilter.value) {
-    case 'core':
+    case 'gte4':
       return item.importance >= 4
+    case 'gte3':
+      return item.importance >= 3
+    case 'gte2':
+      return item.importance >= 2
     case 'high':
       return item.frequency === 'high'
     case 'productive':
@@ -43,6 +92,8 @@ function matchesPriorityFilter(item) {
       return true
   }
 }
+
+const isFilterActive = computed(() => hasImportanceSelection.value || priorityFilter.value !== 'all')
 
 const loaded = ref(false)
 const refVocabulary = reactive(vocabulary)
@@ -61,7 +112,7 @@ const filteredWordCount = computed(() => {
 
 const filteredIndexMap = computed(() => {
   const map = new Map()
-  if (priorityFilter.value === 'all')
+  if (!isFilterActive.value)
     return map
   const cur = refVocabulary[category.value]
   let idx = 0
@@ -274,26 +325,48 @@ function copyAllError() {
                 {{ k }}
               </option>
             </select>
-            <select
-              v-model="priorityFilter"
-              class="ml-2 block w-full flex-1 border border-gray-300 rounded-lg bg-gray-50 p-2.5 text-sm text-gray-900 dark:border-gray-600 focus:border-blue-500 dark:bg-gray-700 dark:text-white focus:ring-blue-500 dark:focus:border-blue-500 dark:focus:ring-blue-500 dark:placeholder-gray-400"
-            >
-              <option value="all">
-                全部词汇
-              </option>
-              <option value="core">
-                仅核心词（重要度 ≥4）
-              </option>
-              <option value="high">
-                仅高频词
-              </option>
-              <option value="productive">
-                仅产出型
-              </option>
-              <option value="receptive">
-                仅识记型
-              </option>
-            </select>
+            <div ref="filterDropdownRef" class="relative ml-2">
+              <button
+                type="button"
+                class="w-56 flex items-center justify-between border border-gray-300 rounded-lg bg-gray-50 p-2.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                aria-haspopup="true" :aria-expanded="isFilterOpen"
+                @click="isFilterOpen = !isFilterOpen"
+              >
+                <span class="truncate">{{ filterSummaryLabel }}</span>
+                <i class="i-ph-caret-down-bold ml-2 flex-shrink-0" />
+              </button>
+              <div
+                v-show="isFilterOpen"
+                class="absolute z-10 mt-1 w-64 border border-gray-200 rounded-lg bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+              >
+                <div class="mb-1 px-2 text-xs font-semibold text-gray-400 dark:text-gray-500">
+                  按条件筛选
+                </div>
+                <button
+                  v-for="opt in PRIORITY_OPTIONS" :key="opt.value"
+                  type="button"
+                  class="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                  :class="{ 'bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-300': !hasImportanceSelection && priorityFilter === opt.value }"
+                  @click="selectPriorityOption(opt.value)"
+                >
+                  {{ opt.label }}
+                </button>
+                <div class="my-2 border-t border-gray-200 dark:border-gray-700" />
+                <div class="mb-1 px-2 text-xs font-semibold text-gray-400 dark:text-gray-500">
+                  按重要度多选
+                </div>
+                <label
+                  v-for="n in [5, 4, 3, 2, 1]" :key="n"
+                  class="flex cursor-pointer items-center rounded px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  <input
+                    v-model="importanceChecks[n]" type="checkbox" class="mr-2"
+                    @change="onImportanceCheckboxChange"
+                  >
+                  重要度 = {{ n }}
+                </label>
+              </div>
+            </div>
             <!-- <input type="text" name="email" class="ml-3 block w-full border border-gray-300 rounded-lg bg-gray-50 p-2.5 text-gray-900 dark:border-gray-600 focus:border-primary-500 dark:bg-gray-700 sm:text-sm dark:text-white focus:ring-primary-500 dark:focus:border-primary-500 dark:focus:ring-primary-500 dark:placeholder-gray-400" placeholder="关键词"> -->
             <!-- <div class="relative ml-2 flex-1">
               <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -382,7 +455,7 @@ function copyAllError() {
                         <div class="flex flex-1 items-center">
                           <span class="text-lg">{{ category }}</span>
                           （ {{ refVocabulary[category].groupCount }} 组 {{ refVocabulary[category].wordCount }} 个词 ）
-                          <span v-if="priorityFilter !== 'all'">，已筛选 {{ filteredWordCount }} 个词</span>
+                          <span v-if="isFilterActive">，已筛选 {{ filteredWordCount }} 个词</span>
                         </div>
                         <div class="justify-items-end">
                           <audio controls class="chapter">
@@ -400,7 +473,7 @@ function copyAllError() {
                       :class="{ 'bg-gray-50 dark:bg-gray-700': item.id % 2 === 0, [`group-color-${i % 15}`]: true }" class="text-sm text-gray-900 dark:text-white"
                     >
                       <td class="p-4">
-                        {{ priorityFilter === 'all' ? item.id : filteredIndexMap.get(item.id) }}
+                        {{ isFilterActive ? filteredIndexMap.get(item.id) : item.id }}
                       </td>
                       <td v-if="item.frequency" class="whitespace-nowrap p-4">
                         <div class="flex flex-col items-start gap-1">
@@ -435,8 +508,8 @@ function copyAllError() {
                           <input
                             :id="item.id" autocomplete="off" :class="getInputStyleClass(item)"
                             type="text"
-                            @focusout="onInputFocusOut($event, item)" 
-                            @focusin="onInputFocusIn($event, `vocabulary/audio/${category}/${item.word[0]}.mp3`)" 
+                            @focusout="onInputFocusOut($event, item)"
+                            @focusin="onInputFocusIn($event, `vocabulary/audio/${category}/${item.word[0]}.mp3`)"
                             @keydown="onInputKeydown"
                           >
                         </template>
